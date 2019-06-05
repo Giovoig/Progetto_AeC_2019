@@ -14,7 +14,7 @@ public:
 
 	//Constructor & destructor
 
-	ExprParser(const vector<string> &str_expr_v);
+	ExprParser(const vector<string> &str_expr_v, const vector<Token> &input_vars);
 
 	~ExprParser();
 
@@ -41,6 +41,8 @@ private:
 	Tree postToTree(const PostExpr &post_expr); //Richiamata solo in postVToTreeV
 
 	vector<Tree> postVToTreeV(const vector<PostExpr> &post_expr_v);
+
+	vector<Tree> flipFlopLink(vector<Tree> vector_tree);
 };
 
 #endif

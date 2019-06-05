@@ -5,14 +5,18 @@
 #include <sstream>
 #include <vector>
 #include <stack>
+#include <iostream>
+using namespace std;
 
 
 //Constructor & destructor
 
 
-ExprParser::ExprParser(const vector<string> &str_expr_v)
+ExprParser::ExprParser(const vector<string> &str_expr_v, const vector<Token> &input_vars)
 {
-	_tree_v = postVToTreeV( parsVToPostV( stringVToParsV(str_expr_v) ) );
+	_tree_v = flipFlopLink( postVToTreeV( parsVToPostV( stringVToParsV(str_expr_v) ) ) );
+	int result = _tree_v[0].tree_root->evaluate(input_vars);
+	cout << result;
 }
 
 
@@ -67,14 +71,14 @@ Token ExprParser::getToken(stringstream & ss)
 			break;
 
 		case 1:
-			if (isalpha(c)) { s += toupper(c); }
+			if (isalpha(c) || isdigit(c)) { s += toupper(c); }
 			else if (isspace(c) || c == ')') { ss.putback(c); return checkWord(s); }
-			else if (isdigit(c)) { s += c; state = 2; }
+			//else if (isdigit(c)) { s += c; state = 2; }
 			else { token.type = ERROR; return token; }
 			break;
 
-		case 2:
-			if (isspace(c))
+		/*case 2:
+			if (isspace(c) || c == ')')
 			{
 				ss.putback(c);
 				if (s[0] == 'F' && s[1] == 'F')
@@ -95,7 +99,7 @@ Token ExprParser::getToken(stringstream & ss)
 				return token;
 			}
 
-			break;
+			break;*/
 		}
 		ss.get(c);
 	}
@@ -119,6 +123,12 @@ Token ExprParser::checkWord(const string & s)
 	if (s == "AND") { token.type = AND; return token; }
 	else if (s == "OR") { token.type = OR; return token; }
 	else if (s == "NOT") { token.type = NOT; return token; }
+	else if (s[0] == 'F' && s[1] == 'F')
+	{
+		token.type = FLIPFLOP;
+		token.id = s;
+		return token;
+	}
 	else { token.type = VARIABLE; token.id = s; return token; }
 	/*else if ((int)s.length() == 1) { full_token.token = variable_id; full_token.id = s; return full_token; }
 	else { full_token.token = illegal_token; return full_token; }*/
@@ -148,6 +158,8 @@ PostExpr ExprParser::parsToPost(const ParsExpr & pars_expr)
 
 	PostExpr postfix_expr;
 
+	postfix_expr.output = pars_expr.output;
+
 	for (int i = 0; i < (int)pars_expr.expr.size(); i++)
 	{
 		switch (pars_expr.expr[i].type)
@@ -162,6 +174,7 @@ PostExpr ExprParser::parsToPost(const ParsExpr & pars_expr)
 			break;
 
 		case VARIABLE:
+		case FLIPFLOP:
 
 			postfix_expr.expr.push_back(pars_expr.expr[i]);
 
@@ -276,4 +289,88 @@ vector<Tree> ExprParser::postVToTreeV(const vector<PostExpr>& post_expr_v)
 	}
 
 	return tree_v;
+}
+
+
+vector<Tree> ExprParser::flipFlopLink(vector<Tree> vector_tree)
+{
+	/*
+		Dato un vettore di alberi disgiunti, ricerca in ogni albero che ha in output una variabile tutti i FF e li connette con il corrispettivo albero (presente nel vettore di partenza).
+		Es.
+		x = FF1 AND FF2
+		FF1 = a OR b
+		FF2 = c AND d
+		=> x = FF1->(a OR b) AND FF2->(c AND d)
+	*/
+	
+	vector<Tree> output_var_trees;
+	Tree curr_tree;
+	Node* found;
+
+	for (int i = 0; i < (int)vector_tree.size(); i++)
+	{
+		if (vector_tree[i].output->getType() == FLIPFLOP)
+		{
+			/*
+				Dapprima, connetto tutti i FF nelle espressioni FF = ... ai corrispettivi alberi
+				Es.
+				FF2 = FF1 AND a
+				FF1 = b OR c
+				=> FF2 = FF1->(b OR c) AND a
+			*/
+			
+			curr_tree = vector_tree[i];
+
+			for (int j = 0; j < (int)vector_tree.size(); j++)
+			{
+				if (vector_tree[j].output->getType() == FLIPFLOP)
+				{
+					//vector_tree[j] è l'albero che ha come output il FF da cui prendere l'albero associato
+
+					found = curr_tree.tree_root->find(vector_tree[j].output->getId(), FLIPFLOP); //Restituisce un puntatore al FF trovato nell'albero corrente (output = FF)
+
+					if (found != nullptr)
+					{
+						found->setInput(vector_tree[j].tree_root);
+					}
+				}
+			}
+		}
+	}
+
+	for (int i = 0; i < (int)vector_tree.size(); i++)
+	{
+		/*
+			Adesso, connetto tutti i FF nelle espressioni var = ... ai corrispettivi alberi
+			Es.
+			x = FF1 AND FF2
+			FF1 = a OR b
+			FF2 = c AND d
+			=> x = FF1->(a OR b) AND FF2->(c AND d)
+		*/
+		
+		if (vector_tree[i].output->getType() == VARIABLE)
+		{
+			curr_tree = vector_tree[i];
+			
+			for (int j = 0; j < (int)vector_tree.size(); j++)
+			{
+				if (vector_tree[j].output->getType() == FLIPFLOP)
+				{
+					//vector_tree[j] è l'albero che ha come output un flip flop
+					
+					found = curr_tree.tree_root->find(vector_tree[j].output->getId(), FLIPFLOP); //Restituisce un puntatore al flip flop trovato nell'albero corrente (output = variable)
+
+					if (found != nullptr)
+					{
+						found->setInput(vector_tree[j].tree_root);
+					}
+				}
+			}
+
+			output_var_trees.push_back(curr_tree);
+		}
+	}
+
+	return output_var_trees;
 }

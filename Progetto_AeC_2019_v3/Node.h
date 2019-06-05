@@ -8,11 +8,20 @@ using namespace std;
 
 class Node
 {
+protected:
+	Type _node_type;
+
 public:
 	Node();
 	~Node();
 
+	Type getType();
+
 	virtual int evaluate(const vector<Token> &input_vars) = 0;
+	virtual void update() = 0;
+	virtual Node* find(string id, Type node_type) = 0;
+	virtual void setInput(Node* input) = 0;
+	
 };
 
 
@@ -21,7 +30,6 @@ class Operator : public Node
 private:
 	Node* _left = nullptr;
 	Node* _right = nullptr;
-	Type _op_type;
 	int _curr_val = -2;
 	int _prev_val = -2;
 
@@ -34,6 +42,9 @@ public:
 	~Operator();
 
 	int evaluate(const vector<Token> &input_vars);
+	void update();
+	Node* find(string id, Type node_type);
+	void setInput(Node* input) { return; };
 };
 
 
@@ -46,7 +57,11 @@ public:
 	Operand();
 	~Operand();
 
+	string getId();
 	virtual int evaluate(const vector<Token> &input_vars) = 0;
+	virtual void update() = 0;
+	Node* find(string id, Type node_type);
+	virtual void setInput(Node* input) = 0;
 };
 
 
@@ -60,6 +75,8 @@ public:
 	~Variable();
 
 	int evaluate(const vector<Token> &input_vars);
+	void update() { return; };
+	void setInput(Node* input) { return; };
 };
 
 
@@ -68,12 +85,15 @@ class FlipFlop : public Operand
 private:
 	int _val_mem = -1;
 	int _val_to_load = -1;
+	Node* _input;
 
 public:
 	FlipFlop(string id);
 	~FlipFlop();
 
 	int evaluate(const vector<Token> &input_vars);
+	void update();
+	void setInput(Node* input);
 };
 
 
